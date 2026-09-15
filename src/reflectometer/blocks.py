@@ -16,7 +16,7 @@ class Block:
     """One editable section of a prompt.
 
     ``pinned`` marks a block that must keep its position, such as the final
-    user turn. The repair planner never moves a pinned block.
+    user turn, so any rewrite of the block order leaves it where it is.
     """
 
     name: str
