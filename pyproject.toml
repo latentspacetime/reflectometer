@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "reflectometer"
+version = "0.1.0"
+description = "Find the edit that threw away your prompt cache, and the rewrite that gets it back."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["prompt-cache", "prefix-cache", "llm", "cost", "inference", "caching"]
+authors = [{ name = "latentspacetime" }]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/latentspacetime/reflectometer"
+Source = "https://github.com/latentspacetime/reflectometer"
+Issues = "https://github.com/latentspacetime/reflectometer/issues"
+
+[project.scripts]
+reflectometer = "reflectometer.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.15,<0.16"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/reflectometer"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
