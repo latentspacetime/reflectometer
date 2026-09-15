@@ -1,4 +1,4 @@
-from reflectometer import Prices, analyse, locate, profile
+from reflectometer import Block, Prices, Prompt, analyse, locate, profile
 from reflectometer.demo import demo_pair, demo_prompts
 from reflectometer.render import render_refusal
 
@@ -23,11 +23,21 @@ def test_an_exact_count_is_labelled():
     )
 
 
-def test_a_refusal_states_its_reason():
+def test_a_refusal_states_its_reason_and_how_it_counted():
     same = demo_prompts()
     text = render_refusal(locate(same, demo_prompts()))
     assert "no break located" in text
     assert "identical" in text
+    assert "estimated, no tokenizer supplied" in text
+
+
+def test_an_edit_that_costs_nothing_is_not_called_a_break():
+    body = " ".join(f"word{index}" for index in range(2000))
+    cached = Prompt([Block("head", "head one "), Block("body", body)])
+    sent = Prompt([Block("head", "head ")])
+    text = str(analyse(cached, sent))
+    assert "cache survived this edit" in text
+    assert "rebilled    0 of those tokens" in text
 
 
 def test_the_profile_rule_is_printed():

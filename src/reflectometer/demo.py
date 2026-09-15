@@ -1,8 +1,8 @@
 """A pair of prompts that show the common way a cache dies.
 
 The assistant stamps the current time into its system block, so every call
-edits the prompt four hundred characters in and the retrieved corpus below it
-is billed again from scratch.
+edits the prompt a hundred characters in, and the retrieved corpus after it is
+billed again from scratch.
 """
 
 from __future__ import annotations

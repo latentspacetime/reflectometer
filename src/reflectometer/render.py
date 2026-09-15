@@ -18,17 +18,18 @@ KIND_TEXT = {
 }
 
 NOTES = (
-    "A break costs the tokens after it, so an edit near the top of a prompt costs far\n"
-    "      more than the same edit near the bottom.",
-    "Cost counts the cached tokens that had to be sent again as ordinary input. It does\n"
-    "      not count writing the new prefix into the cache, which most providers bill at a\n"
-    "      higher rate than input on the call that fills it.",
+    "A break costs the tokens that come after it, so an edit near the start of a prompt\n"
+    "      costs more than an edit near the end, in proportion to the text that follows it.",
+    "Cost covers the cached tokens that had to be sent again as ordinary input. Writing the\n"
+    "      new prefix into the cache is billed separately by most providers, at a rate above\n"
+    "      input, on the call that fills it.",
 )
 
 
 def render(report: Report) -> str:
     found = report.break_
-    lines = ["reflectometer · cache break between two prompts", ""]
+    header = "cache survived this edit" if found.survived else "cache break between two prompts"
+    lines = [f"reflectometer · {header}", ""]
     lines.append(f"  profile     {report.profile.name} · {_profile_rule(report)}")
     lines.append(f"  counting    {_counting(found)}")
     lines.append("")
@@ -39,8 +40,9 @@ def render(report: Report) -> str:
     lines.append(f"  kind        {found.kind} · {KIND_TEXT[found.kind]}")
     lines.append(
         f"  cache       {found.cached_before:,} tokens cached · {found.cached_after:,} survive · "
-        f"{found.lost_tokens:,} thrown away"
+        f"{found.discarded_tokens:,} thrown away"
     )
+    lines.append(f"  rebilled    {found.rebilled_tokens:,} of those tokens are sent again")
     lines.extend(_cost_lines(report))
     lines.append("")
     lines.append("  blocks")
@@ -60,6 +62,7 @@ def render_refusal(refusal: Refusal) -> str:
         [
             "reflectometer · no break located",
             "",
+            f"  counting    {_counting_text(refusal.counted_exactly)}",
             f"  refused     {refusal.reason}",
             f"  because     {detail}",
         ]
@@ -77,7 +80,11 @@ def _profile_rule(report: Report) -> str:
 
 
 def _counting(found: Break) -> str:
-    if found.counted_exactly:
+    return _counting_text(found.counted_exactly)
+
+
+def _counting_text(exact: bool) -> str:
+    if exact:
         return "exact, from the tokenizer you supplied"
     return "estimated, no tokenizer supplied"
 

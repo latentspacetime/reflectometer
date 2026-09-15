@@ -37,13 +37,13 @@ class Report:
     def cost_per_call(self) -> float | None:
         if self.prices is None:
             return None
-        return cost_of(self.break_.lost_tokens, self.prices)
+        return cost_of(self.break_.rebilled_tokens, self.prices)
 
     @property
     def cost_per_period(self) -> float | None:
         if self.prices is None:
             return None
-        return cost_of(self.break_.lost_tokens, self.prices, self.calls)
+        return cost_of(self.break_.rebilled_tokens, self.prices, self.calls)
 
     def to_dict(self) -> dict:
         record: dict = {

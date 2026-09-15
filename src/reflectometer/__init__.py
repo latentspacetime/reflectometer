@@ -1,9 +1,9 @@
-"""Find the edit that threw away your prompt cache, and the rewrite that gets it back."""
+"""Find the edit that threw away your prompt cache."""
 
 from __future__ import annotations
 
 from .blocks import Block, Prompt, prompt_from_dicts
-from .breaks import Break, Refusal, locate, shared_prefix_length
+from .breaks import Break, Refusal, locate, shared_prefix_length, surviving_prefix
 from .cost import Prices, cost_of
 from .profiles import EXACT, PROFILES, CacheProfile, profile
 from .report import BlockLine, Report, analyse
@@ -32,4 +32,5 @@ __all__ = [
     "profile",
     "prompt_from_dicts",
     "shared_prefix_length",
+    "surviving_prefix",
 ]
