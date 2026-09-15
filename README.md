@@ -73,28 +73,30 @@ Three lines of the report give what is needed to act:
 A prompt is a list of blocks in the order they are sent. A block is the unit you can edit, so the report names the block that holds the break:
 
 ```python
-from reflectometer import Block, Prompt, Prices, analyse, profile
+from reflectometer import Block, Prices, Prompt, Refusal, analyse, profile
 
-cached = Prompt([
-    Block("system", "You are a support assistant.\nCurrent time: 08:00.\n"),
-    Block("passages", corpus_text),
-    Block("question", "How long are audit logs kept?", pinned=True),
-])
-sent = Prompt([
-    Block("system", "You are a support assistant.\nCurrent time: 08:01.\n"),
-    Block("passages", corpus_text),
-    Block("question", "How long are audit logs kept?", pinned=True),
-])
+corpus_text = "Exported audit logs are kept for thirty days. " * 400
+
+def prompts(clock):
+    return Prompt([
+        Block("system", f"You are a support assistant.\nCurrent time: {clock}.\n"),
+        Block("passages", corpus_text),
+        Block("question", "How long are audit logs kept?", pinned=True),
+    ])
 
 report = analyse(
-    cached, sent,
+    prompts("08:00"),
+    prompts("08:01"),
     profile=profile("breakpoint-1024"),
     prices=Prices(input_per_million=3.00, cache_read_per_million=0.30),
     calls=2_000_000,
 )
 print(report)
-print(report.break_.block_name, report.break_.rebilled_tokens, report.cost_per_period)
+if not isinstance(report, Refusal):
+    print(report.break_.block_name, report.break_.rebilled_tokens, report.cost_per_period)
 ```
+
+`analyse` returns a `Report` or a `Refusal`, and printing either one gives the same text the command line prints. A corpus short enough to fall under the profile's minimum gives a `Refusal`, which is why the example checks.
 
 From the command line, each prompt is a JSON file holding the same list:
 
@@ -105,13 +107,13 @@ From the command line, each prompt is a JSON file holding the same list:
 ```
 
 ```
-reflectometer cached.json sent.json --profile breakpoint-1024
-reflectometer cached.json sent.json --json > break.json
+reflectometer cached.json sent.json
+reflectometer cached.json sent.json --profile breakpoint-1024 --json > break.json
 ```
 
-Block names have to be unique inside a prompt, since the report uses them as addresses. Marking a block `pinned` says it has to keep its position, such as a final user turn, which matters when you decide where a volatile block can move to.
+A `.json` file that will not parse is an error with exit code 1. Every other file is read as a single block named after the file, and the report gives a character offset into that file, which is usable when the prompt is assembled by other code.
 
-A plain text file is read as a single block named after the file, and the report gives a character offset into that file, which is usable when the prompt is assembled by other code.
+Block names have to be unique inside a prompt, since the report uses them as addresses. Marking a block `pinned` says it has to keep its position, such as a final user turn, which matters when you decide where a volatile block can move to.
 
 Exit code is 0 for a report, 2 for a refusal, and 1 for bad input.
 
@@ -133,7 +135,7 @@ Set the numbers to whatever your provider documents:
 reflectometer cached.json sent.json --block-tokens 128 --min-prefix 1024
 ```
 
-Break address is a character offset, so every profile reports the same address. Profile decides how many cached tokens that break is counted as having discarded.
+Break address is a character offset, so every profile that reports an address reports the same one. Profile decides how many cached tokens that break is counted as having discarded, and whether the prompt was cacheable at all.
 
 ## Repair
 
@@ -259,7 +261,7 @@ Reflectometer takes two prompts from the caller and reports where the cache ende
 ```
 uv venv && uv pip install -e ".[dev]"
 .venv/bin/python -m pytest
-ruff check . && ruff format --check .
+.venv/bin/ruff check . && .venv/bin/ruff format --check .
 ```
 
 ## License

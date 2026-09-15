@@ -6,7 +6,6 @@ Every line that could be read as an exact token count says whether it is one.
 from __future__ import annotations
 
 import textwrap
-from collections.abc import Collection
 
 from .breaks import Break, Refusal
 from .cost import Prices, cost_of
@@ -113,9 +112,7 @@ def _cost_lines(report: Report) -> list[str]:
     ]
 
 
-def render_repair(
-    repair: Repair, prices: Prices | None = None, calls: int = 1, pinned: Collection[str] = ()
-) -> str:
+def render_repair(repair: Repair, prices: Prices | None = None, calls: int = 1) -> str:
     """Text form of a proposed block order and the prefix it keeps."""
     lines = ["reflectometer · proposed block order", ""]
     lines.append(f"  counting    {_counting_text(repair.counted_exactly)}")
@@ -138,7 +135,7 @@ def render_repair(
             notes.append(f"was {moved.from_index}")
         if name in repair.volatile:
             notes.append("changes every call")
-        if name in pinned:
+        if name in repair.pinned:
             notes.append("pinned")
         suffix = f"   {', '.join(notes)}" if notes else ""
         lines.append(f"    {position}  {name:<{width}}{suffix}".rstrip())

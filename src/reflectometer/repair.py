@@ -41,6 +41,7 @@ class Repair:
     order: tuple[str, ...]
     moves: tuple[Move, ...]
     volatile: tuple[str, ...]
+    pinned: tuple[str, ...]
     cacheable_now: int
     cacheable_after: int
     blocked_by: str | None
@@ -55,11 +56,17 @@ class Repair:
     def helps(self) -> bool:
         return self.gain > 0
 
+    def __str__(self) -> str:
+        from .render import render_repair
+
+        return render_repair(self)
+
     def to_dict(self) -> dict:
         return {
             "order": list(self.order),
             "moves": [move.to_dict() for move in self.moves],
             "volatile": list(self.volatile),
+            "pinned": list(self.pinned),
             "cacheable_now": self.cacheable_now,
             "cacheable_after": self.cacheable_after,
             "gain": self.gain,
@@ -119,6 +126,7 @@ def plan(
         order=order,
         moves=moves,
         volatile=tuple(sorted(changing)),
+        pinned=tuple(block.name for block in cached if block.pinned),
         cacheable_now=cached_prefix(cached, sent, profile=profile, counter=counter),
         cacheable_after=cached_prefix(*after, profile=profile, counter=counter),
         blocked_by=_blocked_by(after[0], changing),

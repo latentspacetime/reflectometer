@@ -13,6 +13,7 @@ from .breaks import (
 )
 from .cost import Prices, cost_of
 from .profiles import EXACT, PROFILES, CacheProfile, profile
+from .render import render, render_refusal, render_repair
 from .repair import Move, Repair, plan, rebuild, reorder, volatile_blocks
 from .report import BlockLine, Report, analyse
 from .tokens import TokenCounter, count_tokens, estimate_tokens
@@ -44,6 +45,9 @@ __all__ = [
     "profile",
     "prompt_from_dicts",
     "rebuild",
+    "render",
+    "render_refusal",
+    "render_repair",
     "reorder",
     "shared_prefix_length",
     "surviving_prefix",

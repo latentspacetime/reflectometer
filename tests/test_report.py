@@ -1,7 +1,7 @@
 import pytest
 
-from reflectometer import Prices, analyse, profile
-from reflectometer.demo import demo_pair
+from reflectometer import Block, Prices, Prompt, analyse, locate, profile
+from reflectometer.demo import demo_pair, demo_prompts
 
 
 def test_the_demo_pair_loses_its_whole_cache_to_a_timestamp():
@@ -50,3 +50,29 @@ def test_the_report_round_trips_to_json_shaped_data():
     assert record["break"]["block_name"] == "system"
     assert record["cost"]["calls"] == 5
     assert len(record["blocks"]) == len(cached)
+
+
+def test_every_edit_kind_survives_the_whole_path(tmp_path):
+    head = Block("head", "shared head text that both prompts carry\n")
+    body = Block("body", "body text " * 50)
+    extra = Block("extra", "added block\n")
+    tail = Block("tail", "tail text\n")
+
+    inserted = analyse(Prompt([head, body, tail]), Prompt([head, extra, body, tail]))
+    removed = analyse(Prompt([head, extra, body, tail]), Prompt([head, body, tail]))
+    reordered = analyse(Prompt([head, body, tail]), Prompt([head, tail, body]))
+
+    assert inserted.break_.kind == "inserted"
+    assert removed.break_.kind == "removed"
+    assert reordered.break_.kind == "reordered"
+    for report in (inserted, removed, reordered):
+        assert report.break_.block_name in {"body", "extra", "tail"}
+        assert str(report).count("kind") == 1
+
+
+def test_a_refusal_prints_the_same_text_the_command_line_prints():
+    from reflectometer.render import render_refusal
+
+    same = demo_prompts()
+    refusal = locate(same, demo_prompts())
+    assert str(refusal) == render_refusal(refusal)

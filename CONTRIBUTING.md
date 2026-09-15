@@ -22,7 +22,7 @@ This document tells anyone changing Reflectometer what the library is for and wh
 ```
 uv venv && uv pip install -e ".[dev]"
 .venv/bin/python -m pytest
-ruff check . && ruff format --check .
+.venv/bin/ruff check . && .venv/bin/ruff format --check .
 ```
 
 All three run in CI on Python 3.10 through 3.13 and must pass before merge.

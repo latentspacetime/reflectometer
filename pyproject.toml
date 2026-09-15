@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
 name = "reflectometer"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Find the edit that threw away your prompt cache, and the rewrite that gets it back."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,8 +14,13 @@ keywords = ["prompt-cache", "prefix-cache", "llm", "cost", "inference", "caching
 authors = [{ name = "latentspacetime" }]
 classifiers = [
     "Development Status :: 4 - Beta",
+    "Environment :: Console",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Information Analysis",
     "Typing :: Typed",
 ]
@@ -31,6 +36,9 @@ reflectometer = "reflectometer.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.15,<0.16"]
+
+[tool.hatch.version]
+path = "src/reflectometer/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/reflectometer"]

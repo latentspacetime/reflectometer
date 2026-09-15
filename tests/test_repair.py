@@ -86,11 +86,20 @@ def test_the_split_demo_recovers_the_prefix_the_timestamp_was_costing():
 
 
 def test_rebuilding_keeps_every_block_and_only_changes_order():
-    cached, _ = demo_pair(split=True)
-    proposed = plan(*demo_pair(split=True), profile=profile("breakpoint-1024"))
+    cached, sent = demo_pair(split=True)
+    proposed = plan(cached, sent, profile=profile("breakpoint-1024"))
     rebuilt = rebuild(cached, proposed.order)
+    assert rebuilt.names() == proposed.order
+    assert rebuilt.names() != cached.names()
     assert sorted(rebuilt.names()) == sorted(cached.names())
-    assert len(rebuilt.text) == len(cached.text)
+    assert sorted(block.text for block in rebuilt) == sorted(block.text for block in cached)
+
+
+def test_a_plan_carries_the_pinned_names_it_honoured():
+    cached, sent = demo_pair(split=True)
+    proposed = plan(cached, sent)
+    assert proposed.pinned == ("question",)
+    assert proposed.to_dict()["pinned"] == ["question"]
 
 
 def test_an_order_that_drops_a_block_is_rejected():

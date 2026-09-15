@@ -51,6 +51,11 @@ class Refusal:
     detail: str
     counted_exactly: bool = True
 
+    def __str__(self) -> str:
+        from .render import render_refusal
+
+        return render_refusal(self)
+
     def to_dict(self) -> dict:
         return {
             "refused": self.reason,
