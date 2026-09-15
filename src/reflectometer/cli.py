@@ -6,8 +6,9 @@ Each prompt is a JSON file holding a list of blocks in the order they are sent:
      {"name": "passage-1", "text": "..."},
      {"name": "question", "text": "...", "pinned": true}]
 
-A file that is not JSON is read as one block named after the file, which is
-enough to get a character offset when the prompt is assembled elsewhere.
+A file whose name does not end in ``.json`` is read as one block named after
+the file, which is enough to get a character offset when the prompt is
+assembled elsewhere. A ``.json`` file that will not parse is an error.
 """
 
 from __future__ import annotations
@@ -21,10 +22,11 @@ from pathlib import Path
 from . import __version__
 from .blocks import Block, Prompt, prompt_from_dicts
 from .breaks import Refusal
-from .cost import Prices
+from .cost import Prices, cost_of
 from .demo import demo_pair
 from .profiles import PROFILES, CacheProfile, profile
-from .render import render_refusal
+from .render import render_refusal, render_repair
+from .repair import plan
 from .report import analyse
 
 REFUSED = 2
@@ -55,6 +57,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"reflectometer: {error}", file=sys.stderr)
         return 1
 
+    if args.repair:
+        proposed = plan(cached, sent, profile=chosen)
+        if isinstance(proposed, Refusal):
+            print(
+                json.dumps(proposed.to_dict(), indent=2) if args.json else render_refusal(proposed)
+            )
+            return REFUSED
+        if args.json:
+            record = proposed.to_dict()
+            if prices is not None:
+                record["saving"] = cost_of(max(proposed.gain, 0), prices, args.calls)
+            print(json.dumps(record, indent=2))
+            return 0
+        print(render_repair(proposed, prices, args.calls))
+        return 0
+
     result = analyse(cached, sent, profile=chosen, prices=prices, calls=args.calls)
     if isinstance(result, Refusal):
         print(json.dumps(result.to_dict(), indent=2) if args.json else render_refusal(result))
@@ -72,6 +90,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("sent", nargs="?", help="the modified copy that was sent next")
     parser.add_argument("--demo", action="store_true", help="run on a built-in pair of prompts")
     parser.add_argument(
+        "--split-demo",
+        action="store_true",
+        help="run on the built-in prompts with the changing line in its own block",
+    )
+    parser.add_argument(
         "--profile",
         choices=sorted(PROFILES),
         default="exact",
@@ -84,16 +107,22 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--calls", type=int, default=1, help="calls to price the break over, default 1"
     )
+    parser.add_argument(
+        "--repair",
+        action="store_true",
+        help="propose a block order that keeps the longest cacheable prefix",
+    )
     parser.add_argument("--json", action="store_true", help="write the report as JSON")
     parser.add_argument("--version", action="version", version=f"reflectometer {__version__}")
     return parser
 
 
 def _load(args: argparse.Namespace) -> tuple[Prompt, Prompt]:
-    if args.demo:
+    if args.demo or args.split_demo:
+        flag = "--split-demo" if args.split_demo else "--demo"
         if args.cached or args.sent:
-            raise ValueError("--demo runs on its own prompts, so drop the file arguments")
-        return demo_pair()
+            raise ValueError(f"{flag} runs on its own prompts, so drop the file arguments")
+        return demo_pair(split=args.split_demo)
     if not args.cached or not args.sent:
         raise ValueError("two prompt files are required, or --demo")
     return _read(Path(args.cached)), _read(Path(args.sent))
@@ -104,10 +133,12 @@ def _read(path: Path) -> Prompt:
     if size > MAX_PROMPT_BYTES:
         raise ValueError(f"{path}: {size:,} bytes is over the {MAX_PROMPT_BYTES:,} byte limit")
     text = path.read_text(encoding="utf-8")
+    if path.suffix.lower() != ".json":
+        return Prompt([Block(path.stem, text)])
     try:
         records = json.loads(text)
-    except json.JSONDecodeError:
-        return Prompt([Block(path.stem, text)])
+    except json.JSONDecodeError as error:
+        raise ValueError(f"{path}: {error}") from None
     if not isinstance(records, list):
         raise ValueError(f"{path}: a prompt file holds a list of blocks")
     return prompt_from_dicts(records)

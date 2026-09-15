@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from reflectometer.cli import main
 
 BLOCKS = [
@@ -57,7 +59,7 @@ def test_demo_refuses_to_ignore_prompt_files(tmp_path, capsys):
 
 def test_an_unknown_profile_exits_1_so_2_still_means_refusal(capsys):
     assert main(["--demo", "--profile", "nope"]) == 1
-    assert "reflectometer:" in capsys.readouterr().err
+    assert "invalid choice: 'nope'" in capsys.readouterr().err
 
 
 def test_a_prompt_file_over_the_size_limit_is_refused(tmp_path, capsys, monkeypatch):
@@ -104,7 +106,16 @@ def test_one_price_without_the_other_is_an_error(capsys):
 
 def test_a_missing_file_is_an_error(capsys):
     assert main(["nowhere.json", "nowhere.json"]) == 1
-    assert "reflectometer:" in capsys.readouterr().err
+    assert "nowhere.json" in capsys.readouterr().err
+
+
+def test_a_json_file_that_will_not_parse_is_an_error(tmp_path, capsys):
+    path = tmp_path / "broken.json"
+    path.write_text('[{"name": "a", "text": "x"},]')
+    assert main([str(path), str(path)]) == 1
+    printed = capsys.readouterr().err
+    assert "broken.json" in printed
+    assert "break" not in printed
 
 
 def test_two_files_are_required(capsys):
@@ -130,5 +141,61 @@ def test_a_prompt_file_holding_an_object_is_rejected(tmp_path, capsys):
 
 
 def test_version_is_printed(capsys):
+    from reflectometer import __version__
+
     assert main(["--version"]) == 0
-    assert "reflectometer" in capsys.readouterr().out
+    assert capsys.readouterr().out.strip() == f"reflectometer {__version__}"
+
+
+def test_repair_proposes_an_order_and_prices_the_gain(capsys):
+    assert (
+        main(
+            [
+                "--split-demo",
+                "--repair",
+                "--profile",
+                "breakpoint-1024",
+                "--input-price",
+                "3.00",
+                "--cache-read-price",
+                "0.30",
+                "--calls",
+                "2000000",
+            ]
+        )
+        == 0
+    )
+    printed = capsys.readouterr().out
+    assert "0 tokens cacheable now · 3,175 after the move" in printed
+    assert "$17,145.00 over 2,000,000 calls" in printed
+    assert "8  clock       was 1, changes every call" in printed
+    assert "9  question    pinned" in printed
+
+
+def test_repair_writes_json_on_request(capsys):
+    assert main(["--split-demo", "--repair", "--json"]) == 0
+    record = json.loads(capsys.readouterr().out)
+    assert record["volatile"] == ["clock"]
+    assert record["pinned"] == ["question"]
+    assert record["order"][-2:] == ["clock", "question"]
+    assert "saving" not in record
+
+
+def test_repair_json_carries_the_saving_when_rates_are_given(capsys):
+    argv = ["--split-demo", "--repair", "--json", "--profile", "breakpoint-1024"]
+    argv += ["--input-price", "3.00"]
+    argv += ["--cache-read-price", "0.30", "--calls", "2000000"]
+    assert main(argv) == 0
+    assert json.loads(capsys.readouterr().out)["saving"] == pytest.approx(17145.0)
+
+
+def test_the_split_demo_moves_the_break_off_the_system_block(capsys):
+    assert main(["--split-demo"]) == 0
+    assert "break       clock" in capsys.readouterr().out
+
+
+def test_repair_refuses_when_no_block_changed(tmp_path, capsys):
+    path = tmp_path / "same.json"
+    path.write_text(json.dumps([{"name": "a", "text": "same text here"}]))
+    assert main([str(path), str(path), "--repair"]) == 2
+    assert "nothing_changes" in capsys.readouterr().out

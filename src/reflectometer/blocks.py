@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
+from typing import overload
 
 
 @dataclass(frozen=True)
@@ -69,7 +70,15 @@ class Prompt(Sequence[Block]):
     def names(self) -> tuple[str, ...]:
         return tuple(block.name for block in self._blocks)
 
-    def __getitem__(self, index):  # type: ignore[override]
+    @overload
+    def __getitem__(self, index: int) -> Block: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Prompt: ...
+
+    def __getitem__(self, index: int | slice) -> Block | Prompt:
+        if isinstance(index, slice):
+            return Prompt(self._blocks[index])
         return self._blocks[index]
 
     def __len__(self) -> int:

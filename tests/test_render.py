@@ -1,6 +1,6 @@
-from reflectometer import Block, Prices, Prompt, analyse, locate, profile
+from reflectometer import Block, Prices, Prompt, analyse, locate, plan, profile
 from reflectometer.demo import demo_pair, demo_prompts
-from reflectometer.render import render_refusal
+from reflectometer.render import render_refusal, render_repair
 
 
 def test_the_report_names_the_break_and_the_money():
@@ -45,3 +45,11 @@ def test_the_profile_rule_is_printed():
     report = analyse(cached, sent, profile=profile("breakpoint-1024"))
     assert "1024-token minimum prefix" in str(report)
     assert "every shared token counts" in str(analyse(cached, sent))
+
+
+def test_a_plan_that_cannot_help_says_which_block_holds_the_prefix():
+    cached = Prompt([Block("ask", "q one", pinned=True), Block("corpus", "text " * 200)])
+    sent = Prompt([Block("ask", "q two", pinned=True), Block("corpus", "text " * 200)])
+    text = render_repair(plan(cached, sent))
+    assert "ask changes every call and is pinned" in text
+    assert "1 tokens cacheable now · 1 after the move · 0 gained" in text

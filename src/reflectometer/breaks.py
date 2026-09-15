@@ -51,6 +51,11 @@ class Refusal:
     detail: str
     counted_exactly: bool = True
 
+    def __str__(self) -> str:
+        from .render import render_refusal
+
+        return render_refusal(self)
+
     def to_dict(self) -> dict:
         return {
             "refused": self.reason,
@@ -140,6 +145,28 @@ def surviving_prefix(text: str, offset: int) -> str:
     return _TRAILING_PARTIAL.sub("", text[:offset])
 
 
+def shared_tokens_between(cached: str, sent: str, counter: TokenCounter | None) -> tuple[int, int]:
+    """Break offset between two prompt texts, and the tokens that survive it."""
+    offset = shared_prefix_length(cached, sent)
+    return offset, count_tokens(surviving_prefix(cached, offset), counter)
+
+
+def cached_prefix(
+    cached: Prompt,
+    sent: Prompt,
+    *,
+    profile: CacheProfile = EXACT,
+    counter: TokenCounter | None = None,
+) -> int:
+    """Tokens of ``cached`` the provider can still reuse when ``sent`` arrives.
+
+    Every measurement of a surviving prefix goes through this function, so a
+    prefix means the same thing wherever it is reported.
+    """
+    _, shared = shared_tokens_between(cached.text, sent.text, counter)
+    return profile.cacheable(shared)
+
+
 def classify(cached: Prompt, sent: Prompt, block_index: int) -> Kind:
     """Name the edit that produced the break at ``block_index`` of the cached prompt.
 
@@ -194,7 +221,7 @@ def locate(
     if offset == len(old_text):
         return Refusal("prefix_intact", REFUSALS["prefix_intact"], exact)
 
-    shared_tokens = count_tokens(surviving_prefix(old_text, offset), counter)
+    _, shared_tokens = shared_tokens_between(old_text, new_text, counter)
     block_index = cached.block_at(offset)
     return Break(
         block_index=block_index,
