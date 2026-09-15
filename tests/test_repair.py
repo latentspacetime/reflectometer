@@ -1,6 +1,15 @@
 import pytest
 
-from reflectometer import Block, Prompt, plan, profile, rebuild, volatile_blocks
+from reflectometer import (
+    Block,
+    Prompt,
+    Refusal,
+    analyse,
+    plan,
+    profile,
+    rebuild,
+    volatile_blocks,
+)
 from reflectometer.demo import demo_pair
 
 
@@ -52,7 +61,8 @@ def test_a_pinned_block_that_changes_every_call_caps_the_prefix():
     )
     proposed = plan(cached, sent)
     assert proposed.blocked_by == "ask"
-    assert proposed.cacheable_after == 0
+    assert proposed.cacheable_after == proposed.cacheable_now
+    assert proposed.gain == 0
     assert not proposed.helps
 
 
@@ -71,7 +81,7 @@ def test_the_split_demo_recovers_the_prefix_the_timestamp_was_costing():
     proposed = plan(cached, sent, profile=profile("breakpoint-1024"))
     assert proposed.volatile == ("clock",)
     assert proposed.cacheable_now == 0
-    assert proposed.cacheable_after == 3159
+    assert proposed.cacheable_after == 3175
     assert proposed.order[-2:] == ("clock", "question")
 
 
@@ -93,3 +103,43 @@ def test_a_plan_says_whether_its_counts_were_exact():
     cached, sent = demo_pair(split=True)
     assert not plan(cached, sent).counted_exactly
     assert plan(cached, sent, counter=len).counted_exactly
+
+
+def test_a_plan_never_reports_a_gain_the_break_locator_disagrees_with():
+    body = " ".join(f"word{index}" for index in range(2000))
+    cached = Prompt(
+        [
+            Block("stable", "stable text "),
+            Block("big", body + " one"),
+            Block("ask", "q one", pinned=True),
+        ]
+    )
+    sent = Prompt(
+        [
+            Block("stable", "stable text "),
+            Block("big", body + " two"),
+            Block("ask", "q two", pinned=True),
+        ]
+    )
+    proposed = plan(cached, sent)
+    measured_now = analyse(cached, sent).break_.cached_after
+    moved = rebuild(cached, proposed.order), rebuild(sent, proposed.order)
+    measured_after = analyse(*moved).break_.cached_after
+    assert proposed.cacheable_now == measured_now
+    assert proposed.cacheable_after == measured_after
+    assert proposed.gain == measured_after - measured_now
+
+
+def test_a_block_added_to_the_sent_prompt_counts_as_changed():
+    cached = Prompt([Block("a", "alpha "), Block("b", "beta")])
+    sent = Prompt([Block("a", "alpha "), Block("x", "extra "), Block("b", "beta")])
+    assert volatile_blocks(cached, sent) == ("x",)
+    proposed = plan(cached, sent)
+    assert proposed.volatile == ("x",)
+
+
+def test_two_identical_prompts_get_a_refusal():
+    cached, _ = demo_pair()
+    result = plan(cached, demo_pair()[0])
+    assert isinstance(result, Refusal)
+    assert result.reason == "nothing_changes"

@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 from .blocks import Block, Prompt, prompt_from_dicts
-from .breaks import Break, Refusal, locate, shared_prefix_length, surviving_prefix
+from .breaks import (
+    Break,
+    Refusal,
+    cached_prefix,
+    locate,
+    shared_prefix_length,
+    surviving_prefix,
+)
 from .cost import Prices, cost_of
 from .profiles import EXACT, PROFILES, CacheProfile, profile
-from .repair import Move, Repair, plan, rebuild, volatile_blocks
+from .repair import Move, Repair, plan, rebuild, reorder, volatile_blocks
 from .report import BlockLine, Report, analyse
 from .tokens import TokenCounter, count_tokens, estimate_tokens
 
@@ -28,6 +35,7 @@ __all__ = [
     "TokenCounter",
     "__version__",
     "analyse",
+    "cached_prefix",
     "cost_of",
     "count_tokens",
     "estimate_tokens",
@@ -36,6 +44,7 @@ __all__ = [
     "profile",
     "prompt_from_dicts",
     "rebuild",
+    "reorder",
     "shared_prefix_length",
     "surviving_prefix",
     "volatile_blocks",

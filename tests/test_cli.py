@@ -153,8 +153,8 @@ def test_repair_proposes_an_order_and_prices_the_gain(capsys):
         == 0
     )
     printed = capsys.readouterr().out
-    assert "0 tokens cacheable now · 3,159 after the move" in printed
-    assert "$17,058.60 over 2,000,000 calls" in printed
+    assert "0 tokens cacheable now · 3,175 after the move" in printed
+    assert "$17,145.00 over 2,000,000 calls" in printed
     assert "8  clock       was 1, changes every call" in printed
     assert "9  question    pinned" in printed
 
@@ -169,3 +169,10 @@ def test_repair_writes_json_on_request(capsys):
 def test_the_split_demo_moves_the_break_off_the_system_block(capsys):
     assert main(["--split-demo"]) == 0
     assert "break       clock" in capsys.readouterr().out
+
+
+def test_repair_refuses_when_no_block_changed(tmp_path, capsys):
+    path = tmp_path / "same.json"
+    path.write_text(json.dumps([{"name": "a", "text": "same text here"}]))
+    assert main([str(path), str(path), "--repair"]) == 2
+    assert "nothing_changes" in capsys.readouterr().out

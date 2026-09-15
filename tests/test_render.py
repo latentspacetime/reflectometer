@@ -52,4 +52,4 @@ def test_a_plan_that_cannot_help_says_which_block_holds_the_prefix():
     sent = Prompt([Block("ask", "q two", pinned=True), Block("corpus", "text " * 200)])
     text = render_repair(plan(cached, sent), pinned=["ask"])
     assert "ask changes every call and is pinned" in text
-    assert "0 tokens cacheable now · 0 after the move" in text
+    assert "1 tokens cacheable now · 1 after the move · 0 gained" in text

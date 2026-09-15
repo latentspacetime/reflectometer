@@ -2,9 +2,11 @@
 
 2026-09-15 00:42 PST
 
-## Intent
+## INTENT
 
-Reflectometer is a Python library that finds the edit that threw away your prompt cache. You give it the prompt your provider already cached and the modified copy you sent next, and it reports the character where the cached prompt and the sent prompt stop matching, the block you can edit to fix it, how many cached tokens that edit discarded, what those tokens cost at your call volume, and a block order that would keep the cache. This document covers install, a demo that prints a worked cost calculation, how prefix caching decides what survives, the contents of the report, how to feed your own prompts from Python or from a JSON file, the two provider rules that decide how much of a prefix is cacheable, how to supply a tokenizer so token counts are exact, the six cases that produce a refusal and the exit code each one returns, the proposed block order and what it is worth, measured evidence that the break address does not depend on the token counter, the command line arguments, related work, and how to run the tests. License is MIT.
+Reflectometer is a Python library that finds the edit that threw away your prompt cache. You give it the prompt your provider already cached and the modified copy you sent next, and it reports the character where the two stop matching, the block you can edit to fix it, how many cached tokens that edit discarded, what those tokens cost at your call volume, and a block order that would keep the cache.
+
+This document covers install, a demo that prints a worked cost calculation, how prefix caching decides what survives, the contents of the report, how to feed your own prompts from Python or from a JSON file, the two provider rules that decide how much of a prefix is cacheable, how to supply a tokenizer so token counts are exact, the six cases that produce a refusal and the exit code each one returns, the proposed block order and what it is worth, how a block marked pinned holds its place, why a block that changes in one line has to be split before it can move, measured evidence that the break address holds under any token counter, the command line arguments, related work, and how to run the tests. License is MIT.
 
 ## Install
 
@@ -13,13 +15,13 @@ pip install git+https://github.com/latentspacetime/reflectometer
 reflectometer --demo --profile breakpoint-1024 --input-price 3.00 --cache-read-price 0.30 --calls 2000000
 ```
 
-The demo runs on a support assistant whose system block carries the current time, which is a common cause of a broken cache.
+The demo runs on a support assistant whose system block carries the current time, so the prompt changes on every call.
 
 ## How a break happens
 
-A provider caches a prompt from the first token forward. On the next call it keeps the cached work up to the first token that differs from what it cached, and everything after that point is computed and billed again. A change near the start of a prompt therefore forces almost the whole prompt to be computed again, while a change near the end forces only the tokens that follow it.
+A provider caches a prompt from the first token forward. On the next call it keeps the cached work up to the first token that differs from what it cached, and everything after that point is computed and billed again. A change near the start of a prompt forces almost the whole prompt to be computed again. A change near the end forces only the tokens that follow it.
 
-Position of an edit therefore determines how many tokens are billed again, and Reflectometer reports that position for a given pair of prompts.
+Reflectometer reports that position for a given pair of prompts.
 
 ## Report
 
@@ -58,7 +60,7 @@ reflectometer · cache break between two prompts
 
 The output above is what the demo command prints. Character 101 is the timestamp in the system block, 101 characters into a prompt of about 11,000 characters, and it discards every cached token that comes after it, each time the prompt is sent.
 
-A prompt that only grows keeps its cache, so a sent prompt that holds the cached prompt whole and adds to the end of it returns a refusal saying the cached prefix still matches in full. A sent prompt that drops text is billed for what it sends, so `rebilled` counts the cached tokens that the sent prompt still carries after the break, while `cache` counts every cached token the provider stopped being able to reuse.
+A prompt that only grows keeps its cache, so a sent prompt that holds the cached prompt whole and adds to the end of it returns a refusal saying the cached prefix still matches in full. When a sent prompt drops text, it is billed for what it sends. `rebilled` counts the cached tokens the sent prompt still carries after the break. `cache` counts every cached token the provider stopped being able to reuse.
 
 Three lines of the report give what is needed to act:
 
@@ -109,7 +111,7 @@ reflectometer cached.json sent.json --json > break.json
 
 Block names have to be unique inside a prompt, since the report uses them as addresses. Marking a block `pinned` says it has to keep its position, such as a final user turn, which matters when you decide where a volatile block can move to.
 
-A file that is not JSON is read as a single block named after the file, and the report gives a character offset into that file, which is usable when the prompt is assembled by other code.
+A plain text file is read as a single block named after the file, and the report gives a character offset into that file, which is usable when the prompt is assembled by other code.
 
 Exit code is 0 for a report, 2 for a refusal, and 1 for bad input.
 
@@ -131,11 +133,11 @@ Set the numbers to whatever your provider documents:
 reflectometer cached.json sent.json --block-tokens 128 --min-prefix 1024
 ```
 
-The break address is a character offset, so it is the same under every profile. The profile changes how many cached tokens that break is counted as having discarded.
+Break address is a character offset, so every profile reports the same address. Profile decides how many cached tokens that break is counted as having discarded.
 
 ## Repair
 
-A prompt keeps its cache when every block that changes between calls sits below every block that stays the same. `--repair` works out which blocks changed, proposes an order that puts those blocks last, and measures the prefix that order would keep:
+A prompt keeps its cache when every volatile block comes after every stable block. `--repair` works out which blocks changed, proposes an order that puts those blocks last, and measures the prefix that order would keep. Both orders are measured by the same code that locates a break, so a proposed order that would shorten the prefix reports a negative gain:
 
 ```
 reflectometer · proposed block order
@@ -143,8 +145,8 @@ reflectometer · proposed block order
   counting    estimated, no tokenizer supplied
   volatile    clock
 
-  prefix      0 tokens cacheable now · 3,159 after the move · 3,159 gained
-  saving      $17,058.60 over 2,000,000 calls
+  prefix      0 tokens cacheable now · 3,175 after the move · 3,175 gained
+  saving      $17,145.00 over 2,000,000 calls
 
   order
     0  system
@@ -166,9 +168,9 @@ reflectometer · proposed block order
 
 That output is `reflectometer --split-demo --repair --profile breakpoint-1024 --input-price 3.00 --cache-read-price 0.30 --calls 2000000`.
 
-A block marked `pinned` holds its position, so a final user turn stays last. Every other block keeps its order inside its own group, with the stable group placed first. When the block that changes every call is pinned, the plan says so and reports a gain of zero, since no move can lift the prefix past it.
+A pair where no block changed gets a refusal with exit code 2, since no order can keep more of a prompt that is already stable. A block marked `pinned` holds its position, so a final user turn stays last. Every other block keeps its order inside its own group, with the stable group placed first. When the block that changes every call is pinned, the plan says so and reports a gain of zero, because the prefix ends at that block under every order.
 
-A block that is only partly volatile counts as volatile in full, which is what happens when a timestamp sits inside a long system block. Split the changing line into its own block first, which is what `--split-demo` shows against `--demo`, and the planner then has something it can move.
+A timestamp inside a long system block makes that whole block volatile. Split the changing line into its own block first, and the planner then has a block it can move. `--split-demo` runs the built-in prompts after that split, so it can be compared against `--demo`.
 
 From Python:
 
@@ -180,11 +182,11 @@ print(proposed.volatile, proposed.gain)
 fixed = rebuild(cached, proposed.order)
 ```
 
-Moving a block changes what the model reads, so a plan is a proposal to check before sending.
+`plan` returns an order and `rebuild` applies it to a prompt, so a proposed order takes effect when `rebuild` is called. Moving a block changes what the model reads, so check an order before sending it.
 
 ## Token counts
 
-Reflectometer estimates tokens when no tokenizer is supplied, and every report states whether counts came from an estimate or from a supplied tokenizer. Estimated counts are enough to rank one break against another, because both are counted the same way. Pass your provider's tokenizer when the discarded token count has to be exact:
+Reflectometer estimates tokens when no tokenizer is supplied, and every report states whether counts came from an estimate or from a supplied tokenizer. Estimated counts are enough to rank one break against another, because both are counted the same way. Pass your provider's tokenizer when discarded token counts have to be exact:
 
 ```python
 import tiktoken
@@ -205,7 +207,7 @@ Distinct break addresses across 4 counters: 1
 Distinct rebilled token counts: 4
 ```
 
-Break address holds at character 101 under every counter, and the token and dollar figures move with the counter, which is why a break is worth comparing against another break under the same counter and worth pricing only with a tokenizer you trust.
+Break address holds at character 101 under all four counters. Token counts and dollar figures change with the counter, so compare two breaks only when both were counted the same way, and price a break with your provider's tokenizer.
 
 ## Refusals
 
@@ -244,13 +246,13 @@ reflectometer · no break located
 | `--calls` | calls to price the break over, default 1 |
 | `--json` | write the report as JSON |
 | `--repair` | propose a block order that keeps the longest cacheable prefix |
-| `--demo` | run on a built-in pair of prompts, with no file arguments |
+| `--demo` | run on a built-in pair of prompts, so `cached` and `sent` can be left out |
 | `--split-demo` | run on the built-in prompts with the changing line in its own block |
 | `--version` | print the installed version |
 
 ## Related work
 
-Serving systems including vLLM, SGLang, and Prompt Cache implement prefix caching, and decide what to reuse while a request runs. Published work on cache auditing detects whether a prefix was cached at all, by timing responses from an endpoint, and cost studies compare caching strategies across prompts. Reflectometer works on two prompts supplied by the caller, and reports the character offset of the edit that ended the cache, the number of cached tokens that edit discarded, the cost of those tokens at a stated call volume, and a block order that would keep the prefix.
+Reflectometer takes two prompts from the caller and reports where the cache ended, what it cost, and an order that would keep it. Serving systems including vLLM, SGLang, and Prompt Cache implement prefix caching and decide what to reuse while a request runs. Published work on cache auditing times responses from an endpoint to detect whether a prefix was cached at all, and cost studies compare caching strategies across prompts.
 
 ## Development
 

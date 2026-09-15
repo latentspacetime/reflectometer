@@ -58,11 +58,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.repair:
         proposed = plan(cached, sent, profile=chosen)
+        if isinstance(proposed, Refusal):
+            print(
+                json.dumps(proposed.to_dict(), indent=2) if args.json else render_refusal(proposed)
+            )
+            return REFUSED
         if args.json:
             print(json.dumps(proposed.to_dict(), indent=2))
-        else:
-            pinned = [block.name for block in cached if block.pinned]
-            print(render_repair(proposed, prices, args.calls, pinned))
+            return 0
+        pinned = [block.name for block in cached if block.pinned]
+        print(render_repair(proposed, prices, args.calls, pinned))
         return 0
 
     result = analyse(cached, sent, profile=chosen, prices=prices, calls=args.calls)
@@ -110,11 +115,10 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _load(args: argparse.Namespace) -> tuple[Prompt, Prompt]:
-    if args.split_demo:
-        args.demo = True
-    if args.demo:
+    if args.demo or args.split_demo:
+        flag = "--split-demo" if args.split_demo else "--demo"
         if args.cached or args.sent:
-            raise ValueError("--demo runs on its own prompts, so drop the file arguments")
+            raise ValueError(f"{flag} runs on its own prompts, so drop the file arguments")
         return demo_pair(split=args.split_demo)
     if not args.cached or not args.sent:
         raise ValueError("two prompt files are required, or --demo")
