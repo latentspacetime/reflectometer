@@ -8,7 +8,9 @@ Reflectometer finds the edit that invalidated a prompt cache and prices what it 
 - Break address is a character offset and never depends on how tokens are counted. Anything that makes the address move with the token counter is a bug.
 - Every report says whether its token counts came from a supplied tokenizer or from the estimator.
 - A prompt pair with no break to locate gets a `Refusal`, not a number with a caveat. Malformed input raises `ValueError`. Those two cases stay separate.
-- Prompt structure lives in `blocks.py`, cache rules in `profiles.py`, rates in `cost.py`, location in `breaks.py`, and text output in `render.py`. Keep pure functions pure.
+- A proposed block order is a proposal, never an edit. `plan` returns an order and `rebuild` applies one, and a block marked `pinned` is never moved.
+- Every claim in README about how much a number moves is measured. `examples/counters.py` runs the same prompt pair under four token counters, and any README statement about counter sensitivity comes from a run of that script.
+- Prompt structure lives in `blocks.py`, cache rules in `profiles.py`, rates in `cost.py`, location in `breaks.py`, block order in `repair.py`, and text output in `render.py`. Keep pure functions pure.
 
 ## Checks
 

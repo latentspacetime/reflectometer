@@ -24,7 +24,8 @@ from .breaks import Refusal
 from .cost import Prices
 from .demo import demo_pair
 from .profiles import PROFILES, CacheProfile, profile
-from .render import render_refusal
+from .render import render_refusal, render_repair
+from .repair import plan
 from .report import analyse
 
 REFUSED = 2
@@ -55,6 +56,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"reflectometer: {error}", file=sys.stderr)
         return 1
 
+    if args.repair:
+        proposed = plan(cached, sent, profile=chosen)
+        if args.json:
+            print(json.dumps(proposed.to_dict(), indent=2))
+        else:
+            pinned = [block.name for block in cached if block.pinned]
+            print(render_repair(proposed, prices, args.calls, pinned))
+        return 0
+
     result = analyse(cached, sent, profile=chosen, prices=prices, calls=args.calls)
     if isinstance(result, Refusal):
         print(json.dumps(result.to_dict(), indent=2) if args.json else render_refusal(result))
@@ -72,6 +82,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("sent", nargs="?", help="the modified copy that was sent next")
     parser.add_argument("--demo", action="store_true", help="run on a built-in pair of prompts")
     parser.add_argument(
+        "--split-demo",
+        action="store_true",
+        help="run on the built-in prompts with the changing line in its own block",
+    )
+    parser.add_argument(
         "--profile",
         choices=sorted(PROFILES),
         default="exact",
@@ -84,16 +99,23 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--calls", type=int, default=1, help="calls to price the break over, default 1"
     )
+    parser.add_argument(
+        "--repair",
+        action="store_true",
+        help="propose a block order that keeps the longest cacheable prefix",
+    )
     parser.add_argument("--json", action="store_true", help="write the report as JSON")
     parser.add_argument("--version", action="version", version=f"reflectometer {__version__}")
     return parser
 
 
 def _load(args: argparse.Namespace) -> tuple[Prompt, Prompt]:
+    if args.split_demo:
+        args.demo = True
     if args.demo:
         if args.cached or args.sent:
             raise ValueError("--demo runs on its own prompts, so drop the file arguments")
-        return demo_pair()
+        return demo_pair(split=args.split_demo)
     if not args.cached or not args.sent:
         raise ValueError("two prompt files are required, or --demo")
     return _read(Path(args.cached)), _read(Path(args.sent))

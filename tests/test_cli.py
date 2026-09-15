@@ -132,3 +132,40 @@ def test_a_prompt_file_holding_an_object_is_rejected(tmp_path, capsys):
 def test_version_is_printed(capsys):
     assert main(["--version"]) == 0
     assert "reflectometer" in capsys.readouterr().out
+
+
+def test_repair_proposes_an_order_and_prices_the_gain(capsys):
+    assert (
+        main(
+            [
+                "--split-demo",
+                "--repair",
+                "--profile",
+                "breakpoint-1024",
+                "--input-price",
+                "3.00",
+                "--cache-read-price",
+                "0.30",
+                "--calls",
+                "2000000",
+            ]
+        )
+        == 0
+    )
+    printed = capsys.readouterr().out
+    assert "0 tokens cacheable now · 3,159 after the move" in printed
+    assert "$17,058.60 over 2,000,000 calls" in printed
+    assert "8  clock       was 1, changes every call" in printed
+    assert "9  question    pinned" in printed
+
+
+def test_repair_writes_json_on_request(capsys):
+    assert main(["--split-demo", "--repair", "--json"]) == 0
+    record = json.loads(capsys.readouterr().out)
+    assert record["volatile"] == ["clock"]
+    assert record["order"][-2:] == ["clock", "question"]
+
+
+def test_the_split_demo_moves_the_break_off_the_system_block(capsys):
+    assert main(["--split-demo"]) == 0
+    assert "break       clock" in capsys.readouterr().out

@@ -36,10 +36,11 @@ CHUNK_TOPICS = [
 ]
 
 
-def _system(stamp: str) -> str:
+def _system(stamp: str | None) -> str:
     lines = ["You are the support assistant for a document storage product.", ""]
-    lines.append(f"Current date and time: {stamp}.")
-    lines.append("")
+    if stamp is not None:
+        lines.append(f"Current date and time: {stamp}.")
+        lines.append("")
     lines.extend(f"{position}. {rule}" for position, rule in enumerate(RULES, start=1))
     lines.append("")
     lines.append(
@@ -58,9 +59,16 @@ def _chunk(position: int, topic: str) -> str:
     return f"[passage-{position}] {topic}\n{body}\n\n"
 
 
-def demo_prompts(stamp: str = "2026-09-15 08:00:00 PST") -> Prompt:
-    """Build one prompt with ``stamp`` written into the system block."""
-    blocks = [Block("system", _system(stamp)), Block("tools", TOOL_TEXT)]
+def demo_prompts(stamp: str = "2026-09-15 08:00:00 PST", *, split: bool = False) -> Prompt:
+    """Build one prompt carrying ``stamp``.
+
+    With ``split`` the stamp sits in its own ``clock`` block, which is the shape
+    a caller needs before the stamp can be moved off the cached prefix.
+    """
+    blocks = [Block("system", _system(None if split else stamp))]
+    if split:
+        blocks.append(Block("clock", f"Current date and time: {stamp}.\n"))
+    blocks.append(Block("tools", TOOL_TEXT))
     blocks.extend(
         Block(f"passage-{position}", _chunk(position, topic))
         for position, topic in enumerate(CHUNK_TOPICS, start=1)
@@ -71,6 +79,9 @@ def demo_prompts(stamp: str = "2026-09-15 08:00:00 PST") -> Prompt:
     return Prompt(blocks)
 
 
-def demo_pair() -> tuple[Prompt, Prompt]:
+def demo_pair(*, split: bool = False) -> tuple[Prompt, Prompt]:
     """The prompt the provider cached, and the same prompt one minute later."""
-    return demo_prompts(), demo_prompts("2026-09-15 08:01:00 PST")
+    return (
+        demo_prompts(split=split),
+        demo_prompts("2026-09-15 08:01:00 PST", split=split),
+    )
